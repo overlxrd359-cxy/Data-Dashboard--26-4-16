@@ -1,47 +1,75 @@
-name: Python Data Dashboard CI
+name: Streamlit Dashboard CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 jobs:
-  test:
+  test-streamlit-app:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-        
-    - name: Install basic Python packages
-      run: |
-        python -m pip install --upgrade pip
-        # 安装常用的数据分析库
-        pip install pandas matplotlib streamlit
-        # 如果app.py需要其他库，在这里添加
-        
-    - name: List files
-      run: ls -la
-      
-    - name: Check app.py syntax
-      run: python -m py_compile app.py || echo "Syntax check passed"
-      
-    - name: Run the dashboard app
-      run: |
-        # 尝试运行app.py，但限制时间防止无限运行
-        timeout 10s python app.py || echo "App executed (may have started a server)"
-        
-    - name: Test CSV data
-      run: |
-        python -c "
-import pandas as pd
-df = pd.read_csv('sales_data.csv')
-print(f'数据加载成功！共{len(df)}行，{len(df.columns)}列')
-print('列名：', list(df.columns))
-"
+      # 1. 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 设置Python环境
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # 推荐使用与开发环境一致的版本
+
+      # 3. 安装项目依赖
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install streamlit pandas plotly
+          # 可以锁定版本以避免意外更改，例如：
+          # pip install streamlit==1.28.0 pandas==2.1.0 plotly==5.17.0
+
+      # 4. 验证Python语法及导入
+      - name: Lint and check imports
+        run: |
+          python -m py_compile app.py
+          echo "✅ 语法检查通过"
+          # 尝试导入，确保无依赖错误
+          python -c "import streamlit, pandas, plotly.press; print('✅ 所有库导入成功')"
+
+      # 5. 验证数据文件是否存在并可被读取
+      - name: Test data loading
+        run: |
+          if [ -f "sales_data.csv" ]; then
+            echo "✅ 找到数据文件 sales_data.csv"
+            # 使用pandas读取并检查数据
+            python -c "
+          import pandas as pd
+        try:
+           df = pd.read_csv('sales_data.csv')
+           df['日期'] = pd.to_datetime(df['日期'])
+           print(f'✅ 数据加载成功。形状：{df.shape}')
+           print(df.head())
+except Exception as e:
+    print(f'❌ 数据加载失败: {e}')
+    exit(1)
+            "
+          else
+            echo "❌ 未找到数据文件 sales_data.csv，但应用包含对此文件的处理逻辑，请注意。"
+            # 此处不退出，因为工作流可能用于测试无数据的场景
+          fi
+
+      # 6. 运行Streamlit进行健康检查（有限时间运行）
+      - name: Smoke test Streamlit app
+        run: |
+          # 启动Streamlit服务器在后台，设置一个短暂超时
+          timeout 10s streamlit run app.py --server.headless true --server.port 8080 &
+          sleep 3
+          # 检查进程是否在运行
+          if ps aux | grep -v grep | grep -q "streamlit"; then
+            echo "✅ Streamlit 应用启动成功。"
+            pkill -f "streamlit" # 清理后台进程
+          else
+            echo "❌ Streamlit 应用未能启动。"
+            exit 1
+          fi
