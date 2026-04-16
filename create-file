@@ -1,0 +1,27 @@
+# generate_data.py (运行一次即可)
+import pandas as pd
+import random
+from datetime import datetime, timedelta
+
+# 生成模拟数据
+dates = [datetime.now() - timedelta(days=x) for x in range(30)]
+categories = ['电子产品', '家居用品', '服装', '书籍']
+products = {
+    '电子产品': ['手机', '耳机', '平板'],
+    '家居用品': ['枕头', '台灯', '收纳盒'],
+    '服装': ['T恤', '牛仔裤', '外套'],
+    '书籍': ['小说', '技术书', '杂志']
+}
+
+data = []
+for date in dates:
+    for _ in range(5): # 每天5条记录
+        cat = random.choice(categories)
+        prod = random.choice(products[cat])
+        price = random.randint(20, 2000)
+        quantity = random.randint(1, 5)
+        data.append([date.strftime('%Y-%m-%d'), cat, prod, price, quantity, price * quantity])
+
+df = pd.DataFrame(data, columns=['日期', '类别', '产品', '单价', '数量', '总金额'])
+df.to_csv('sales_data.csv', index=False, encoding='utf-8-sig') # utf-8-sig 防止中文乱码
+print("✅ sales_data.csv 已生成")
